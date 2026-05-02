@@ -6,6 +6,6 @@
 1. Cài Node.js
 2. Mở terminal tại thư mục project
 3. Chạy:
-   npm install
-   npm rundev
+- npm install
+- npm run dev
 4. Mở local host
