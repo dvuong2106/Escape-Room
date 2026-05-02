@@ -13,32 +13,32 @@ function startGame() {
 }
 
 // Vị trí nút "Bắt đầu" trong ảnh gốc (tính theo tỉ lệ 0–1)
-const BTN_LEFT   = 0.370; // % từ trái
-const BTN_TOP    = 0.770; // % từ trên
-const BTN_WIDTH  = 0.285; // % chiều rộng ảnh
+const BTN_LEFT = 0.370; // % từ trái
+const BTN_TOP = 0.770; // % từ trên
+const BTN_WIDTH = 0.285; // % chiều rộng ảnh
 const BTN_HEIGHT = 0.105; // % chiều cao ảnh
 
-const startScreen   = document.getElementById('start-screen');
-const startBgImg    = document.getElementById('start-bg-img');
+const startScreen = document.getElementById('start-screen');
+const startBgImg = document.getElementById('start-bg-img');
 const startClickZone = document.getElementById('start-click-zone');
 
 function positionClickZone() {
     if (!startBgImg || !startClickZone) return;
     const sw = window.innerWidth;
     const sh = window.innerHeight;
-    const iw = startBgImg.naturalWidth  || 1920;
+    const iw = startBgImg.naturalWidth || 1920;
     const ih = startBgImg.naturalHeight || 1080;
 
     // Tính scale & offset khi object-fit: contain
-    const scale   = Math.min(sw / iw, sh / ih);
-    const rw      = iw * scale;  // chiều rộng ảnh sau render
-    const rh      = ih * scale;  // chiều cao ảnh sau render
-    const offX    = (sw - rw) / 2;
-    const offY    = (sh - rh) / 2;
+    const scale = Math.min(sw / iw, sh / ih);
+    const rw = iw * scale;  // chiều rộng ảnh sau render
+    const rh = ih * scale;  // chiều cao ảnh sau render
+    const offX = (sw - rw) / 2;
+    const offY = (sh - rh) / 2;
 
-    startClickZone.style.left   = (offX + BTN_LEFT  * rw) + 'px';
-    startClickZone.style.top    = (offY + BTN_TOP   * rh) + 'px';
-    startClickZone.style.width  = (BTN_WIDTH  * rw) + 'px';
+    startClickZone.style.left = (offX + BTN_LEFT * rw) + 'px';
+    startClickZone.style.top = (offY + BTN_TOP * rh) + 'px';
+    startClickZone.style.width = (BTN_WIDTH * rw) + 'px';
     startClickZone.style.height = (BTN_HEIGHT * rh) + 'px';
 }
 
@@ -129,6 +129,16 @@ function checkShelfPuzzleAndOpenDoors() {
 
     if (isSolved) {
         showObjectName("Các quyển sách đã được sắp xếp chính xác! Cửa tủ đang mở...");
+
+        // Xóa laptop khỏi túi đồ
+        const laptopSlotImg = document.querySelector('.slot img[data-item-name*="" i], .slot img[data-item-name*="Cube013" i]');
+        if (laptopSlotImg) {
+            const laptopSlot = laptopSlotImg.parentElement;
+            laptopSlot.removeChild(laptopSlotImg);
+            laptopSlot.title = '';
+            laptopSlot.classList.remove('selected');
+        }
+
         scene.traverse(child => {
             if (!child.name) return;
             const nameLowerCase = child.name.toLowerCase();
@@ -531,13 +541,19 @@ window.addEventListener('mouseup', (event) => {
             }
 
             // Kiểm tra nhặt chìa khóa key002
-            let keyObj = clickedObject;
-            while (keyObj) {
-                if (keyObj.name && (keyObj.name.toLowerCase().includes('key002') || keyObj.name.toLowerCase().includes('key.002'))) {
-                    break;
+            let keyObj = null;
+            for (let i = 0; i < intersects.length; i++) {
+                let currObj = intersects[i].object;
+                while (currObj) {
+                    if (currObj.name && (currObj.name.toLowerCase().includes('key002') || currObj.name.toLowerCase().includes('key.002'))) {
+                        keyObj = currObj;
+                        break;
+                    }
+                    currObj = currObj.parent;
                 }
-                keyObj = keyObj.parent;
+                if (keyObj) break;
             }
+            
             if (keyObj && keyObj.visible !== false) {
                 if (!pickedItemCache.has(keyObj.name)) {
                     pickedItemCache.set(keyObj.name, keyObj.clone());
