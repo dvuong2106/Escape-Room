@@ -10,11 +10,11 @@
 - npm run dev
 4. Mở local host
 
-## ------------------------------------------------------
+# ------------------------------------------------------
 
-# Hướng Dẫn Chơi Game "Escape Room 3D"
+# Hướng Dẫn Chơi Game "Escape Room"
 
-Chào mừng bạn đến với dự án Escape Room 3D! Mục tiêu của bạn là khám phá căn nhà, tìm kiếm manh mối, giải các câu đố và tìm cách thoát ra ngoài. Tài liệu này hướng dẫn chi tiết cách thức thao tác và tương tác trong toàn bộ quá trình chơi.
+Chào mừng bạn đến với dự án Escape Room! Mục tiêu của bạn là khám phá căn nhà, tìm kiếm manh mối, giải các câu đố và tìm cách thoát ra ngoài. Tài liệu này hướng dẫn chi tiết cách thức thao tác và tương tác trong toàn bộ quá trình chơi.
 
 ---
 
