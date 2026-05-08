@@ -193,6 +193,10 @@ window.addEventListener('mouseup', (event) => {
     // Bỏ qua click nếu người dùng đang bấm vào khung túi đồ
     if (event.target.closest('#inventory-container')) return;
 
+    // Bỏ qua click nếu đang mở settings panel
+    if (event.target.closest('#settings-overlay') || event.target.closest('#settings-btn')) return;
+
+
     // Bỏ qua click nếu đang mở laptop UI
     const laptopUI = document.getElementById('laptop-ui');
     if (laptopUI && laptopUI.style.display !== 'none') return;
@@ -770,7 +774,7 @@ window.addEventListener('mouseup', (event) => {
         if (currentRoom === 'main_room') {
             loadRoom(scene, '/models/kitchen.glb', 1);
             currentRoom = 'kitchen';
-            showObjectName("Phòng ăn");
+            showObjectName("Phòng bếp");
         } else if (currentRoom === 'kitchen') {
             loadRoom(scene, '/models/main_room.glb', -1);
             currentRoom = 'main_room';
@@ -2159,38 +2163,237 @@ function render() {
     renderer.render(scene, camera);
 }
 
-// --- HỆ THỐNG NHẠC NỀN ---
+// ============================================================
+// HỆ THỐNG NHẠC NỀN + SETTINGS PANEL
+// ============================================================
 const bgmAudio = document.getElementById('bgm-audio');
-const musicToggleBtn = document.getElementById('music-toggle-btn');
 let isMusicPlaying = false;
 let userHasInteracted = false;
 
-if (bgmAudio && musicToggleBtn) {
-    // Trình duyệt yêu cầu người dùng phải tương tác web ít nhất 1 lần mới cho phát nhạc
+// --- Phát nhạc tự động sau lần tương tác đầu tiên ---
+if (bgmAudio) {
     window.addEventListener('mousedown', () => {
         if (!userHasInteracted) {
             userHasInteracted = true;
-            // Tự động phát nhạc ở lần click đầu tiên với âm lượng 50%
             bgmAudio.volume = 0.5;
-            bgmAudio.play().then(() => {
-                isMusicPlaying = true;
-                musicToggleBtn.textContent = '🔊';
-            }).catch(err => console.log('Không thể phát nhạc tự động:', err));
+            bgmAudio.play()
+                .then(() => { isMusicPlaying = true; })
+                .catch(err => console.log('Không thể phát nhạc tự động:', err));
         }
     }, { once: true });
+}
 
-    musicToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Ngăn chặn sự kiện click lan xuống 3D
-        if (isMusicPlaying) {
+// ── SETTINGS PANEL ────────────────────────────────────────────
+const settingsBtn     = document.getElementById('settings-btn');
+const settingsOverlay = document.getElementById('settings-overlay');
+const settingsPauseBtn   = document.getElementById('settings-pause-btn');
+const settingsPauseIcon  = document.getElementById('settings-pause-icon');
+const settingsPauseText  = document.getElementById('settings-pause-text');
+const settingsRestartBtn = document.getElementById('settings-restart-btn');
+const settingsCloseBtn   = document.getElementById('settings-close-btn');
+const volumeSlider    = document.getElementById('settings-volume-slider');
+const volumeVal       = document.getElementById('settings-volume-val');
+
+let isPaused = false; // trạng thái tạm dừng
+
+// Hàm cập nhật gradient thanh âm lượng
+function updateVolumeSliderStyle(val) {
+    const pct = val + '%';
+    volumeSlider.style.setProperty('--pct', pct);
+    volumeVal.textContent = val;
+}
+
+// Mở settings
+function openSettings() {
+    settingsOverlay.style.display = 'flex';
+    // Delay nhỏ để CSS transition hoạt động
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => settingsOverlay.classList.add('open'));
+    });
+    // Cập nhật trạng thái nút tạm dừng
+    if (isPaused) {
+        settingsPauseIcon.textContent = '▶';
+        settingsPauseText.textContent = 'Tiếp Tục';
+    } else {
+        settingsPauseIcon.textContent = '⏸';
+        settingsPauseText.textContent = 'Tạm Dừng';
+    }
+}
+
+// Đóng settings
+function closeSettings() {
+    settingsOverlay.classList.remove('open');
+    setTimeout(() => { settingsOverlay.style.display = 'none'; }, 260);
+}
+
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openSettings();
+    });
+}
+
+// Đóng khi click ra ngoài panel
+if (settingsOverlay) {
+    settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === settingsOverlay) closeSettings();
+    });
+}
+if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener('click', closeSettings);
+}
+
+// ── 1. TẠM DỪNG / TIẾP TỤC ───────────────────────────────────
+// Lưu trạng thái quan trọng vào sessionStorage để có thể khôi phục
+function collectGameState() {
+    // Thu thập inventory hiện tại
+    const invSlots = [];
+    document.querySelectorAll('#inventory-slots .slot').forEach(slot => {
+        const img = slot.querySelector('img');
+        if (img) {
+            invSlots.push({
+                itemName: img.dataset.itemName,
+                src: img.src,
+                qty: parseInt(slot.dataset.qty || '1', 10),
+            });
+        } else {
+            invSlots.push(null);
+        }
+    });
+    return {
+        currentRoom,
+        inventory: invSlots,
+        volume: bgmAudio ? Math.round(bgmAudio.volume * 100) : 50,
+    };
+}
+
+function applyGameState(state) {
+    if (!state) return;
+    // Khôi phục âm lượng
+    if (bgmAudio && state.volume !== undefined) {
+        bgmAudio.volume = state.volume / 100;
+        updateVolumeSliderStyle(state.volume);
+        volumeSlider.value = state.volume;
+    }
+    // Inventory khôi phục sẽ được tải lại bởi startGame (phòng đã cache)
+}
+
+if (settingsPauseBtn) {
+    settingsPauseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!isPaused) {
+            // --- TẠM DỪNG: lưu state, hiện lại màn hình bắt đầu ---
+            const state = collectGameState();
+            sessionStorage.setItem('escapeRoomSave', JSON.stringify(state));
+            isPaused = true;
+
+            // Tạm dừng nhạc
+            if (bgmAudio && isMusicPlaying) {
+                bgmAudio.pause();
+            }
+
+            closeSettings();
+
+            // Hiện lại start screen bằng cách tạo mới nếu đã bị xóa
+            let ss = document.getElementById('start-screen');
+            if (!ss) {
+                ss = document.createElement('div');
+                ss.id = 'start-screen';
+                ss.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity 1.2s ease;background:#000;';
+                const img = document.createElement('img');
+                img.className = 'start-bg';
+                img.src = '/start.png';
+                img.alt = 'Start Screen';
+                img.id = 'start-bg-img';
+                img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;object-position:center;background:#000;pointer-events:none;';
+                const zone = document.createElement('div');
+                zone.id = 'start-click-zone';
+                zone.style.cssText = 'position:absolute;cursor:pointer;z-index:2;';
+                ss.appendChild(img);
+                ss.appendChild(zone);
+                document.body.appendChild(ss);
+            } else {
+                ss.style.opacity = '1';
+                ss.style.pointerEvents = 'auto';
+                ss.style.display = 'flex';
+            }
+
+            // Gắn lại listener để tiếp tục game khi nhấn bắt đầu
+            const resumeClickZone = ss.querySelector('#start-click-zone');
+            if (resumeClickZone) {
+                // Định vị lại click zone
+                const bgImg = ss.querySelector('#start-bg-img');
+                function positionResumeZone() {
+                    if (!bgImg || !resumeClickZone) return;
+                    const sw = window.innerWidth, sh = window.innerHeight;
+                    const iw = bgImg.naturalWidth || 1920, ih = bgImg.naturalHeight || 1080;
+                    const scale = Math.min(sw/iw, sh/ih);
+                    const rw = iw*scale, rh = ih*scale;
+                    const offX = (sw-rw)/2, offY = (sh-rh)/2;
+                    resumeClickZone.style.left   = (offX + 0.370*rw) + 'px';
+                    resumeClickZone.style.top    = (offY + 0.770*rh) + 'px';
+                    resumeClickZone.style.width  = (0.285*rw) + 'px';
+                    resumeClickZone.style.height = (0.105*rh) + 'px';
+                }
+                bgImg.addEventListener('load', positionResumeZone);
+                window.addEventListener('resize', positionResumeZone);
+                if (bgImg.complete && bgImg.naturalWidth) positionResumeZone();
+
+                const onResume = () => {
+                    // Ẩn start screen
+                    ss.style.opacity = '0';
+                    ss.style.pointerEvents = 'none';
+                    setTimeout(() => { if (ss.parentNode) ss.parentNode.removeChild(ss); }, 1300);
+                    // Tiếp tục nhạc
+                    if (bgmAudio && userHasInteracted) {
+                        bgmAudio.play().then(() => { isMusicPlaying = true; }).catch(() => {});
+                    }
+                    isPaused = false;
+                };
+                resumeClickZone.addEventListener('click', onResume, { once: true });
+            }
+
+        } else {
+            // --- TIẾP TỤC: chỉ đóng panel ---
+            isPaused = false;
+            if (bgmAudio && userHasInteracted) {
+                bgmAudio.play().then(() => { isMusicPlaying = true; }).catch(() => {});
+            }
+            closeSettings();
+        }
+    });
+}
+
+// ── 2. CHƠI LẠI ──────────────────────────────────────────────
+if (settingsRestartBtn) {
+    settingsRestartBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sessionStorage.removeItem('escapeRoomSave');
+        window.location.reload();
+    });
+}
+
+// ── 3. ÂM LƯỢNG ──────────────────────────────────────────────
+if (volumeSlider && bgmAudio) {
+    // Đặt giá trị ban đầu
+    volumeSlider.value = 50;
+    updateVolumeSliderStyle(50);
+
+    volumeSlider.addEventListener('input', () => {
+        const val = parseInt(volumeSlider.value, 10);
+        bgmAudio.volume = val / 100;
+        updateVolumeSliderStyle(val);
+        // Nếu kéo lên > 0 và nhạc đang tắt thì tự bật
+        if (val > 0 && !isMusicPlaying && userHasInteracted) {
+            bgmAudio.play().then(() => { isMusicPlaying = true; }).catch(() => {});
+        }
+        // Nếu kéo về 0 thì tắt nhạc
+        if (val === 0 && isMusicPlaying) {
             bgmAudio.pause();
             isMusicPlaying = false;
-            musicToggleBtn.textContent = '🔈';
-        } else {
-            bgmAudio.play();
-            isMusicPlaying = true;
-            musicToggleBtn.textContent = '🔊';
         }
     });
 }
 
 render();
+
