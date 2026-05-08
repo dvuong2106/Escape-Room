@@ -70,18 +70,36 @@ export function setupScene() {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // --- Cấu hình renderer để hiển thị đúng materials PBR từ Blender ---
+    // Bắt buộc: chuyển output sang SRGB để màu sắc không bị tối/mất màu
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Tone mapping để ánh sáng trông tự nhiên (giống Blender Cycles)
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    // Bật shadow map để bóng đổ hiển thị
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
     document.body.appendChild(renderer.domElement);
 
-    // Thêm ánh sáng để thấy được Model
-    const light = new THREE.DirectionalLight(0xffffff, 3);
-    light.position.set(5, 10, 7.5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x404040));
+    // --- Ánh sáng (physically correct mode - Three.js r152+) ---
+    // Ambient light: chiếu sáng toàn cảnh, tránh bóng tối hoàn toàn
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
 
-    const light2 = new THREE.DirectionalLight(0xffffff, 3);
-    light2.position.set(-5, 10, -7.5);
+    // Directional light chính (từ trên xuống, phía trước)
+    const light = new THREE.DirectionalLight(0xffffff, 2.5);
+    light.position.set(5, 10, 7.5);
+    light.castShadow = true;
+    light.shadow.mapSize.width = 2048;
+    light.shadow.mapSize.height = 2048;
+    scene.add(light);
+
+    // Directional light phụ (từ phía sau, fill light)
+    const light2 = new THREE.DirectionalLight(0xffffff, 1.2);
+    light2.position.set(-5, 8, -7.5);
     scene.add(light2);
-    scene.add(new THREE.AmbientLight(0x404040));
 
     // Gọi hàm loadRoom để tải phòng mặc định
     // loadRoom(scene, '/models/main_room.glb'); // Chúng ta sẽ gọi từ main.js
